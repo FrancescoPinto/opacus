@@ -22,9 +22,10 @@ from opacus.utils.tensor_utils import unfold2d, unfold3d
 from opt_einsum import contract
 
 from .utils import register_grad_sampler
+from opacus.layers.weight_scaled_conv import WSConv2d
 
 
-@register_grad_sampler([nn.Conv1d, nn.Conv2d, nn.Conv3d])
+@register_grad_sampler([nn.Conv1d, nn.Conv2d, nn.Conv3d, WSConv2d])
 def compute_conv_grad_sample(
     layer: Union[nn.Conv1d, nn.Conv2d, nn.Conv3d],
     activations: torch.Tensor,
