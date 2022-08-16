@@ -27,7 +27,7 @@ from opacus.layers.weight_scaled_conv import WSConv2d
 
 @register_grad_sampler([nn.Conv1d, nn.Conv2d, nn.Conv3d, WSConv2d])
 def compute_conv_grad_sample(
-    layer: Union[nn.Conv1d, nn.Conv2d, nn.Conv3d],
+    layer: Union[nn.Conv1d, nn.Conv2d, nn.Conv3d,WSConv2d],
     activations: torch.Tensor,
     backprops: torch.Tensor,
 ) -> Dict[nn.Parameter, torch.Tensor]:
@@ -41,7 +41,7 @@ def compute_conv_grad_sample(
     """
     n = activations.shape[0]
     # get activations and backprops in shape depending on the Conv layer
-    if type(layer) == nn.Conv2d:
+    if type(layer) == nn.Conv2d or type(layer) == WSConv2d:
         activations = unfold2d(
             activations,
             kernel_size=layer.kernel_size,
