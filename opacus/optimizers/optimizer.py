@@ -204,6 +204,7 @@ class DPOptimizer(Optimizer):
         loss_reduction: str = "mean",
         generator=None,
         secure_mode: bool = False,
+        aug_mult: int = 0,
     ):
         """
 
@@ -245,6 +246,7 @@ class DPOptimizer(Optimizer):
         self.state = self.original_optimizer.state
         self._step_skip_queue = []
         self._is_last_step_skipped = False
+        self.aug_mult = aug_mult
 
         for p in self.params:
             p.summed_grad = None
@@ -288,6 +290,65 @@ class DPOptimizer(Optimizer):
             ret = torch.cat(p.grad_sample, dim=0)
         else:
             raise ValueError(f"Unexpected grad_sample type: {type(p.grad_sample)}")
+
+        if self.aug_mult > 0:
+            shape = list(ret.shape)
+            #print("before anything", shape)
+            assert (shape[0] % self.aug_mult == 0)  # in case of wrong allocation (e.g. due to different available size of memory)
+            # it might happen the batch will be split in a wrong way and that will screw up everything, so crash ...
+            # it is crucial to make sure all GPUs have the same available memory so that the DDP doesn't split things in a werid way
+
+            #these asserts should not be triggered when no augmentations are used (debug only)
+            #assert (torch.allclose(ret[0], ret[self.aug_mult - 1], atol=1e-05))
+            #assert (not torch.allclose(ret[0], ret[self.aug_mult], atol=1e-05))
+            shape[0] = int(shape[0] / self.aug_mult)
+            shape.insert(1, self.aug_mult)
+            b = ret.reshape(shape)
+            #print("new grad ", shape)
+            # self.grad_samples[_] = self.grad_samples[_].reshape(shape)
+            #print("bef mean ", b.shape)
+            # self.grad_samples[_] = self.grad_samples[_].mean(axis=0)
+            # print("aft mean ", self.grad_samples[_].shape)
+            #print("aft mean ", b.shape)
+            # self.grad_samples[_] = b
+            # print("grad aft mean", self.grad_samples[_].shape)
+            #if ret[0].device == 0:
+            #print("reshapall", ret.shape) #B*M x ...
+            #print("bshapall", b.shape) #B x M ...
+
+            #print("reshap", ret[0].shape)
+            #print("bshap", b[0,0].shape)
+
+            #this was the bug ... it returned true ...
+            #for b_idx in range(b.shape[1]): # B
+            #    for aug_mult_idx in range(b.shape[0]): # M
+                    # if B = 2
+            #        if torch.allclose(ret[b_idx], b[aug_mult_idx,b_idx], atol=1e-05):
+            #            #print(f"ret[{b_idx}] == b[{aug_mult_idx},{b_idx}]", torch.allclose(ret[b_idx], b[aug_mult_idx,b_idx]))
+            #this is the correct one, now returns true ...
+            #for b_idx in range(ret.shape[0]):
+            #    if torch.allclose(ret[b_idx], b[b_idx // self.aug_mult, b_idx % self.aug_mult]):
+            #        print( f"ret[{b_idx}], b[ {b_idx // self.aug_mult},{b_idx % self.aug_mult}] are equal")
+
+            b = b.mean(axis=1)
+
+            #print("ret0", ret[0])
+            #print("ret1", ret[1])
+            #print("ret9", ret[9])
+            #print("b0", b[0])
+            #print("b1", b[1])
+            #print("b9", b[9])
+            #return ret
+            #print("ret ", ret[:self.aug_mult].shape)
+            #print("b ", b[:self.aug_mult].shape)
+            #print("retmean ", ret[:self.aug_mult].mean(0, keepdim=True).shape)
+            #print("bmean ", b[:self.aug_mult].mean(0, keepdim=True).shape)
+            #print("similar?", torch.allclose(ret[:self.aug_mult].mean(0, keepdim=True), b[:self.aug_mult].mean(0, keepdim=True), atol=1e-05))
+            #assert(torch.allclose(ret[:self.aug_mult].mean(0, keepdim=True), b[:self.aug_mult].mean(0, keepdim=True)))
+            ret = b
+            #print("augmult reduction done")
+            # print("grad ", g.shape)
+            # print(torch.allclose(g[0], g[1], atol=1e-05))
 
         return ret
 
@@ -393,6 +454,40 @@ class DPOptimizer(Optimizer):
         Performs gradient clipping.
         Stores clipped and aggregated gradients into `p.summed_grad```
         """
+        #new_grad_samples = []
+        #for _ in range(len(self.grad_samples)):
+        #    #assumption B*M x whatever
+        #    #B = batch size
+        #    #M = multiplicity of augmentation
+        #    #then reshape it so that it becomes M x B x whatever and then take the mean of the gradient along M
+        #    shape = list(self.grad_samples[_].shape)
+        #    print("orig grad ", shape)
+        #    assert(shape[0] % self.aug_mult == 0) #in case of wrong allocation (e.g. due to different available size of memory)
+        #    #it might happen the batch will be split in a wrong way and that will screw up everything, so crash ...
+        #    #it is crucial to make sure all GPUs have the same available memory so that the DDP doesn't split things in a werid way
+        #    assert(torch.allclose(self.grad_samples[_][0], self.grad_samples[_][self.aug_mult-1], atol=1e-05))
+        #    assert(not torch.allclose(self.grad_samples[_][0], self.grad_samples[_][self.aug_mult], atol=1e-05))
+        #    shape[0] = shape[0] // self.aug_mult
+        #    shape.insert(0, self.aug_mult)
+        #    b = self.grad_samples[_].reshape(shape)
+        #    print("new grad ", shape)
+        #    #self.grad_samples[_] = self.grad_samples[_].reshape(shape)
+        #    print("bef mean ", b.shape)
+        #    b = b.mean(axis=0)
+        #    #self.grad_samples[_] = self.grad_samples[_].mean(axis=0)
+        #    #print("aft mean ", self.grad_samples[_].shape)
+        #    print("aft mean ", b.shape)
+        #    #self.grad_samples[_] = b
+        #    #print("grad aft mean", self.grad_samples[_].shape)
+        #    new_grad_samples.append(b)
+        #    #print("grad ", g.shape)
+        #    #print(torch.allclose(g[0], g[1], atol=1e-05))
+        #self.grad_samples = new_grad_samples
+        #print("trying after ", self.grad_samples[0].shape)
+
+        #for _ in range(len(self.grad_samples)):
+        #    print("in the clip ", self.grad_samples[_].shape)
+        #    break
 
         per_param_norms = [
             g.norm(2, dim=tuple(range(1, g.ndim))) for g in self.grad_samples

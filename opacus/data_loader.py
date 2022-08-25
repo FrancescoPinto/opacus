@@ -106,6 +106,7 @@ class DPDataLoader(DataLoader):
         prefetch_factor: int = 2,
         persistent_workers: bool = False,
         distributed: bool = False,
+        aug_mult: int = 0
     ):
         """
 
@@ -136,6 +137,7 @@ class DPDataLoader(DataLoader):
                 total_size=len(dataset),  # type: ignore[assignment, arg-type]
                 sample_rate=sample_rate,
                 generator=generator,
+                aug_mult=aug_mult
             )
         else:
             batch_sampler = UniformWithReplacementSampler(
@@ -168,7 +170,7 @@ class DPDataLoader(DataLoader):
 
     @classmethod
     def from_data_loader(
-        cls, data_loader: DataLoader, *, distributed: bool = False, generator=None
+        cls, data_loader: DataLoader, *, distributed: bool = False, generator=None, aug_mult=0
     ):
         """
         Creates new ``DPDataLoader`` based on passed ``data_loader`` argument.
@@ -207,6 +209,7 @@ class DPDataLoader(DataLoader):
             prefetch_factor=data_loader.prefetch_factor,
             persistent_workers=data_loader.persistent_workers,
             distributed=distributed,
+            aug_mult=aug_mult
         )
 
 

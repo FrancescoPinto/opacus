@@ -38,6 +38,7 @@ class DistributedDPOptimizer(DPOptimizer):
         loss_reduction: str = "mean",
         generator=None,
         secure_mode: bool = False,
+        aug_mult:int = 0,
     ):
         super().__init__(
             optimizer,
@@ -47,6 +48,7 @@ class DistributedDPOptimizer(DPOptimizer):
             loss_reduction=loss_reduction,
             generator=generator,
             secure_mode=secure_mode,
+            aug_mult=aug_mult
         )
         self.rank = torch.distributed.get_rank()
         self.world_size = torch.distributed.get_world_size()
