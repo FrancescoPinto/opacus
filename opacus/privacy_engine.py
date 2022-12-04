@@ -155,6 +155,8 @@ class PrivacyEngine:
         clipping: str = "flat",
         noise_generator=None,
         grad_sample_mode="hooks",
+        aug_mult:int = 0,
+        compute_percentage_clipping:bool = False
     ) -> DPOptimizer:
         if isinstance(optimizer, DPOptimizer):
             optimizer = optimizer.original_optimizer
@@ -179,6 +181,8 @@ class PrivacyEngine:
             loss_reduction=loss_reduction,
             generator=generator,
             secure_mode=self.secure_mode,
+            aug_mult=aug_mult,
+            compute_percentage_clipping = compute_percentage_clipping
         )
 
     def _prepare_data_loader(
@@ -187,6 +191,7 @@ class PrivacyEngine:
         *,
         poisson_sampling: bool,
         distributed: bool,
+        aug_mult:int=0,
     ) -> DataLoader:
         if self.dataset is None:
             self.dataset = data_loader.dataset
@@ -202,7 +207,7 @@ class PrivacyEngine:
 
         if poisson_sampling:
             return DPDataLoader.from_data_loader(
-                data_loader, generator=self.secure_rng, distributed=distributed
+                data_loader, generator=self.secure_rng, distributed=distributed, aug_mult=aug_mult
             )
         elif self.secure_mode:
             return switch_generator(data_loader=data_loader, generator=self.secure_rng)
@@ -319,6 +324,7 @@ class PrivacyEngine:
         clipping: str = "flat",
         noise_generator=None,
         grad_sample_mode: str = "hooks",
+        aug_mult:int = 0
     ) -> Tuple[GradSampleModule, DPOptimizer, DataLoader]:
         """
         Add privacy-related responsibilites to the main PyTorch training objects:
@@ -409,7 +415,7 @@ class PrivacyEngine:
             module.register_backward_hook(forbid_accumulation_hook)
 
         data_loader = self._prepare_data_loader(
-            data_loader, distributed=distributed, poisson_sampling=poisson_sampling
+            data_loader, distributed=distributed, poisson_sampling=poisson_sampling, aug_mult=aug_mult
         )
 
         sample_rate = 1 / len(data_loader)
@@ -430,6 +436,7 @@ class PrivacyEngine:
             distributed=distributed,
             clipping=clipping,
             grad_sample_mode=grad_sample_mode,
+            aug_mult=aug_mult
         )
 
         optimizer.attach_step_hook(
@@ -452,6 +459,7 @@ class PrivacyEngine:
         loss_reduction: str = "mean",
         noise_generator=None,
         grad_sample_mode="hooks",
+        aug_mult=0,
         **kwargs,
     ):
         """
@@ -526,6 +534,7 @@ class PrivacyEngine:
             loss_reduction=loss_reduction,
             noise_generator=noise_generator,
             grad_sample_mode=grad_sample_mode,
+            aug_mult=aug_mult,
         )
 
     def get_epsilon(self, delta):

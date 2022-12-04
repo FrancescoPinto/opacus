@@ -83,6 +83,7 @@ class DistributedUniformWithReplacementSampler(Sampler):
         shuffle: bool = True,
         shuffle_seed: int = 0,
         generator=None,
+        aug_mult=0,
     ):
         """
 
@@ -103,6 +104,7 @@ class DistributedUniformWithReplacementSampler(Sampler):
         self.epoch = 0
         self.shuffle = shuffle
         self.shuffle_seed = shuffle_seed
+        self.aug_mult = aug_mult
 
         if self.total_size <= 0:
             raise ValueError(
@@ -142,7 +144,20 @@ class DistributedUniformWithReplacementSampler(Sampler):
             )
             selected_examples = mask.nonzero(as_tuple=False).reshape(-1)
             if len(selected_examples) > 0:
-                yield indices[selected_examples]
+                #print(indices[selected_examples].repeat_interleave(3))
+                #print(indices[selected_examples])
+                result_idx = None
+                if self.aug_mult > 0:
+                    #print("sending aug mult out")
+                    #print("*"*40)
+                    #print(indices[selected_examples].repeat_interleave(self.aug_mult))
+                    #print("*"*40)
+                    result_idx =  indices[selected_examples].repeat_interleave(self.aug_mult)
+                else:
+                    result_idx =  indices[selected_examples]
+                #print("Returning indices", result_idx.shape)
+                #print("multiplicity", self.aug_mult)
+                yield result_idx
 
     def __len__(self) -> int:
         """

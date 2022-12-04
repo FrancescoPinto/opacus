@@ -339,6 +339,9 @@ class GradSampleModule(AbstractGradSampleModule):
             )
 
         n = module.max_batch_len
+
+        #guess: since the loss has been reduced with mean, this means the mean has been applied BEFORE
+        #per-sample clipping, therefore you "cancel" the effect of dividing by n, no need of modifications if you do sum
         if loss_reduction == "mean":
             backprops = backprops * n
         elif loss_reduction == "sum":
